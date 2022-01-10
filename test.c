@@ -155,6 +155,7 @@ int main(int argc, char **argv) {
     
     libusb_clear_halt(handle, ENDPOINT_BULK_READ);
 
+    // Skip this to test only claim-release
 	while(0) {
 
 		usb_read();
