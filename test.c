@@ -33,8 +33,8 @@
 
 // Device details found with: 
 // lsusb -d <VID>: -v 
-#define ENDPOINT_BULK_READ 0x82 // Bulk IN endpoint
-#define USB_BULK_INTERFACE 0x01 // Interface for bulk transfer
+#define ENDPOINT_BULK_READ    0x82 // Bulk IN endpoint
+#define USB_BULK_INTERFACE    0x01 // Interface for bulk transfer
 
 libusb_context* ctx = NULL;
 libusb_device_handle* handle;
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
 	int rc = libusb_init(&ctx);
     assert(rc == 0);
     printf("libusb_init()\n");
-	libusb_set_debug(ctx, 3);
+	libusb_set_debug(ctx, LIBUSB_LOG_LEVEL_DEBUG);
 
     //Open Device with VendorID and ProductID
 	handle = libusb_open_device_with_vid_pid(ctx, VID, PID);
@@ -141,21 +141,22 @@ int main(int argc, char **argv) {
     assert(rc == 0);
     printf("Auto detach kernel driver: enabled\n");
 
-	//Claim Interface 0 from the device
+	// Claim Interface 1 from the device
     rc = libusb_claim_interface(handle, USB_BULK_INTERFACE); // interface 1: bulk
 	if (rc < 0) {
-		fprintf(stderr, "usb_claim_interface error %d\n", r);
+		fprintf(stderr, "usb_claim_interface error %d\n", rc);
 		return 2;
 	}
 	printf("Interface %d claimed\n", USB_BULK_INTERFACE);
 
+    // Never works
     // r = libusb_set_interface_alt_setting(handle, 1, 1);
     // assert(r == 0);
     // printf("Set alternate setting: ok\n");
     
     libusb_clear_halt(handle, ENDPOINT_BULK_READ);
 
-    // Skip this to test only claim-release
+    // Skip this to test claim-release only
 	while(0) {
 
 		usb_read();
@@ -164,7 +165,7 @@ int main(int argc, char **argv) {
 
     rc = libusb_release_interface(handle, USB_BULK_INTERFACE);
     assert(rc == 0);
-    printf("Interface released.\n");
+    printf("Interface %d released.\n", USB_BULK_INTERFACE);
 	libusb_close(handle);
 	libusb_exit(NULL);
 
