@@ -31,8 +31,10 @@
 #define USB_ENDPOINT_OUT	(LIBUSB_ENDPOINT_OUT | 2) 
 #define USB_TIMEOUT	        3000
 
-#define ENDPOINT_BULK_READ 0x82
-#define USB_BULK_INTERFACE 0x01
+// Device details found with: 
+// lsusb -d <VID>: -v 
+#define ENDPOINT_BULK_READ 0x82 // Bulk IN endpoint
+#define USB_BULK_INTERFACE 0x01 // Interface for bulk transfer
 
 libusb_context* ctx = NULL;
 libusb_device_handle* handle;
@@ -55,7 +57,6 @@ int usb_read() {
     }
 	else{
 		printf("%d receive %d bytes from device: %s\n", ++counter, nread, receiveBuf);
-		//printf("%s", receiveBuf);  //Use this for benchmarking purposes
 		return 0;
     }
 
@@ -101,10 +102,6 @@ int usb_write() {
 
 }
 
-/*
- * on SIGINT: close USB interface
- * This still leads to a segfault on my system...
- */
 static void sighandler(int signum) {
 
     printf( "\nInterrupt signal received\n" );
@@ -139,16 +136,14 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-    int r = 0;
-
     // Set auto detach/re-attach of kernel driver
     libusb_set_auto_detach_kernel_driver(handle, 1);
-    assert(r==0);
+    assert(rc == 0);
     printf("Auto detach kernel driver: enabled\n");
 
 	//Claim Interface 0 from the device
-    r = libusb_claim_interface(handle, USB_BULK_INTERFACE); // interface 1: bulk
-	if (r < 0) {
+    rc = libusb_claim_interface(handle, USB_BULK_INTERFACE); // interface 1: bulk
+	if (rc < 0) {
 		fprintf(stderr, "usb_claim_interface error %d\n", r);
 		return 2;
 	}
@@ -166,8 +161,8 @@ int main(int argc, char **argv) {
     
     }
 
-    r = libusb_release_interface(handle, USB_BULK_INTERFACE);
-    assert(r==0);
+    rc = libusb_release_interface(handle, USB_BULK_INTERFACE);
+    assert(rc == 0);
     printf("Interface released.\n");
 	libusb_close(handle);
 	libusb_exit(NULL);
