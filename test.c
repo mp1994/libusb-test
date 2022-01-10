@@ -27,39 +27,34 @@
 #define VID	 0x2e8a
 #define PID	 0x000a
 
-#define USB_ENDPOINT_IN	    (LIBUSB_ENDPOINT_IN  | 1)  
-#define USB_ENDPOINT_OUT	(LIBUSB_ENDPOINT_OUT | 2) 
-#define USB_TIMEOUT	        3000
+#define USB_ENDPOINT_IN	    (LIBUSB_ENDPOINT_IN  | 1)   /* endpoint address */
+#define USB_ENDPOINT_OUT	(LIBUSB_ENDPOINT_OUT | 2)   /* endpoint address */
+#define USB_TIMEOUT	        3000        /* Connection timeout (in ms) */
 
-// Device details found with: 
-// lsusb -d <VID>: -v 
-#define ENDPOINT_BULK_READ    0x82 // Bulk IN endpoint
-#define USB_BULK_INTERFACE    0x01 // Interface for bulk transfer
+static libusb_context *ctx = NULL;
+static libusb_device_handle *handle;
 
-libusb_context* ctx = NULL;
-libusb_device_handle* handle;
-
-static uint8_t receiveBuf[50];
-uint8_t transferBuf[50];
+static uint8_t receiveBuf[64];
+uint8_t transferBuf[64];
 
 uint16_t counter=0;
 
 /*
  * Read a packet
  */
-int usb_read() {
-
-	int nread = 0, ret = 0;
-	ret = libusb_bulk_transfer(handle, ENDPOINT_BULK_READ, receiveBuf, sizeof(receiveBuf), &nread, USB_TIMEOUT);
+static int usb_read(void)
+{
+	int nread, ret;
+	ret = libusb_bulk_transfer(handle, USB_ENDPOINT_IN, receiveBuf, sizeof(receiveBuf), &nread, USB_TIMEOUT);
 	if (ret){
 		printf("ERROR in bulk read: %d\n", ret);
 		return -1;
     }
 	else{
 		printf("%d receive %d bytes from device: %s\n", ++counter, nread, receiveBuf);
+		//printf("%s", receiveBuf);  //Use this for benchmarking purposes
 		return 0;
     }
-
 }
 
 
@@ -68,14 +63,15 @@ int usb_read() {
  *
  */
 uint16_t count=0;
-int usb_write() {
-
+static int usb_write(void)
+{
 	int n, ret;
     //count up
     n = sprintf(transferBuf, "%d\0",count++);
     //write transfer
     //probably unsafe to use n twice...
-	ret = libusb_bulk_transfer(handle, USB_ENDPOINT_OUT, transferBuf, n, &n, USB_TIMEOUT);
+	ret = libusb_bulk_transfer(handle, USB_ENDPOINT_OUT, transferBuf, n,
+			&n, USB_TIMEOUT);
     //Error handling
     switch(ret){
         case 0:
@@ -102,11 +98,15 @@ int usb_write() {
 
 }
 
-static void sighandler(int signum) {
-
+/*
+ * on SIGINT: close USB interface
+ * This still leads to a segfault on my system...
+ */
+static void sighandler(int signum)
+{
     printf( "\nInterrupt signal received\n" );
 	if (handle){
-        libusb_release_interface(handle, USB_BULK_INTERFACE);
+        libusb_release_interface (handle, 0);
         printf( "\nInterrupt signal received1\n" );
         libusb_close(handle);
         printf( "\nInterrupt signal received2\n" );
@@ -116,18 +116,15 @@ static void sighandler(int signum) {
 	printf( "\nInterrupt signal received4\n" );
 
 	exit(0);
-
 }
 
-int main(int argc, char **argv) {
-
+int main(int argc, char **argv)
+{
     //Pass Interrupt Signal to our handler
 	signal(SIGINT, sighandler);
 
-	int rc = libusb_init(&ctx);
-    assert(rc == 0);
-    printf("libusb_init()\n");
-	libusb_set_debug(ctx, LIBUSB_LOG_LEVEL_DEBUG);
+	libusb_init(&ctx);
+	libusb_set_debug(ctx, 4);
 
     //Open Device with VendorID and ProductID
 	handle = libusb_open_device_with_vid_pid(ctx, VID, PID);
@@ -136,39 +133,24 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-    // Set auto detach/re-attach of kernel driver
+    int r = 1;
     libusb_set_auto_detach_kernel_driver(handle, 1);
-    assert(rc == 0);
-    printf("Auto detach kernel driver: enabled\n");
 
-	// Claim Interface 1 from the device
-    rc = libusb_claim_interface(handle, USB_BULK_INTERFACE); // interface 1: bulk
-	if (rc < 0) {
-		fprintf(stderr, "usb_claim_interface error %d\n", rc);
+	//Claim Interface 0 from the device
+    r = libusb_claim_interface(handle, 0);
+	if (r < 0) {
+		fprintf(stderr, "usb_claim_interface error %d\n", r);
 		return 2;
 	}
-	printf("Interface %d claimed\n", USB_BULK_INTERFACE);
+	printf("Interface claimed\n");
 
-    // Never works
-    // r = libusb_set_interface_alt_setting(handle, 1, 1);
-    // assert(r == 0);
-    // printf("Set alternate setting: ok\n");
-    
-    libusb_clear_halt(handle, ENDPOINT_BULK_READ);
-
-    // Skip this to test claim-release only
-	while(0) {
-
+	while (1){
 		usb_read();
-    
+//		usb_write();
     }
-
-    rc = libusb_release_interface(handle, USB_BULK_INTERFACE);
-    assert(rc == 0);
-    printf("Interface %d released.\n", USB_BULK_INTERFACE);
+    //never reached
 	libusb_close(handle);
 	libusb_exit(NULL);
 
 	return 0;
-
 }
