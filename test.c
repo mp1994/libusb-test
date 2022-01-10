@@ -31,6 +31,8 @@
 #define USB_ENDPOINT_OUT	(LIBUSB_ENDPOINT_OUT | 2)   /* endpoint address */
 #define USB_TIMEOUT	        3000        /* Connection timeout (in ms) */
 
+#define USB_BULK_INTERFACE    0x00
+
 static libusb_context *ctx = NULL;
 static libusb_device_handle *handle;
 
@@ -106,7 +108,7 @@ static void sighandler(int signum)
 {
     printf( "\nInterrupt signal received\n" );
 	if (handle){
-        libusb_release_interface (handle, 0);
+        libusb_release_interface (handle, USB_BULK_INTERFACE);
         printf( "\nInterrupt signal received1\n" );
         libusb_close(handle);
         printf( "\nInterrupt signal received2\n" );
@@ -137,7 +139,7 @@ int main(int argc, char **argv)
     libusb_set_auto_detach_kernel_driver(handle, 1);
 
 	//Claim Interface 0 from the device
-    r = libusb_claim_interface(handle, 0);
+    r = libusb_claim_interface(handle, USB_BULK_INTERFACE);
 	if (r < 0) {
 		fprintf(stderr, "usb_claim_interface error %d\n", r);
 		return 2;
